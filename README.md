@@ -1,4 +1,5 @@
-dipper
+Dipper
 ======
 
-Dump data from SQL databases
+Dipper is a tool for dumping data from SQL databases in a smart way.
+
