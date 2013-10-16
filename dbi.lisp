@@ -30,27 +30,38 @@
           (progn ,@body)
        (dbi:disconnect ,conn-var))))
 
-(defun query (conn sql &rest parameters)
-  (let ((statement (dbi:prepare conn sql)))
-    (apply #'dbi:execute (cons statement parameters))))
-
-(defun driver-type (instance)
-  (let* ((conn (slot-value instance 'dbi.driver::connection))
-         (class (class-of conn))
+(defun driver-type (conn)
+  (let* ((class (class-of conn))
          (symbol (class-name class))
          (name (symbol-name symbol)))
     (with-re-match ((type-name) "^<DBD-([^-]+)-.*>$" name)
       (string-to-keyword type-name))))
 
-(defgeneric get-metadata (type query))
+(defgeneric query- (type conn sql &optional parameters))
 
-(defmethod get-metadata ((type (eql :mysql)) query)
+(defparameter *mysql-type-map* (make-hash-table))
+
+(defmethod query- ((type (eql :mysql)) conn sql &optional parameters)
+  (let* ((cl-mysql:*type-map* *mysql-type-map*)
+         (statement (dbi:prepare conn sql)))
+    (apply #'dbi:execute (cons statement parameters))))
+
+(defmethod query- ((type t) conn sql &optional parameters)
+  (let ((statement (dbi:prepare conn sql)))
+    (apply #'dbi:execute (cons statement parameters))))
+
+(defun query (conn sql &optional parameters)
+  (query- (driver-type conn) conn sql parameters))
+
+(defgeneric metadata- (type query))
+
+(defmethod metadata- ((type (eql :mysql)) query)
   (let* ((result (slot-value query 'dbd.mysql::%result))
          (fields (car (cl-mysql::result-set-fields result))))
     (iter (for (name . type) in fields)
           (appending (list (string-to-keyword name) type)))))
 
-(defmethod get-metadata ((type (eql :sqlite3)) query)
+(defmethod metadata- ((type (eql :sqlite3)) query)
   (let* ((statement (dbi.driver:query-prepared query))
          (handle (sqlite::handle statement))
          (ncols (sqlite-ffi:sqlite3-column-count handle)))
@@ -59,7 +70,8 @@
                            (sqlite-ffi:sqlite3-column-type handle i))))))
 
 (defun metadata (query)
-  (get-metadata (driver-type query) query))
+  (let ((conn (dbi.driver::query-connection query)))
+    (metadata- (driver-type conn) query)))
 
 (defun next-row (query)
   (let ((row (dbi:fetch query)))
