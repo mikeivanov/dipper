@@ -1,0 +1,10 @@
+* TODO
+- [ ] don't close stdout!
+- [ ] don't update receipt when no changes
+- [ ] return -1 on errors
+- [ ] return 1 if no changes?
+- [ ] add --config (yaml)
+- [ ] convert receipts to yaml
+- [ ] add --receipts-dir
+- [ ] add --header
+- [ ] add --separator
