@@ -67,8 +67,7 @@
   (cond ((numberp a) (< a b))
         (t (string< a b))))
 
-(defparameter *type-comparators* (list :datetime   #'string<
-                                       :var-string #'string<
+(defparameter *type-comparators* (list :var-string #'string<
                                        :text       #'string<
                                        :null       #'variant<))
 
