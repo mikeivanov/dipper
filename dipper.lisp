@@ -126,7 +126,7 @@
                                        :direction :output
                                        :if-exists :supersede
                                        :if-does-not-exist :create)
-                                 *standard-output*))
+                                 (make-synonym-stream '*standard-output*)))
         (let* ((last-value (or last-value (getf receipt :last-value)))
                (new-receipt (dump-table conn table out
                                         :columns columns
