@@ -40,7 +40,8 @@
                        (error "'~A' is not a valid limit value" limit))))
           (columns (or columns "*"))
           (output (when output (parse-namestring output)))
-          (receipt (when receipt (parse-namestring receipt))))
+          (receipt (when receipt (parse-namestring receipt)))
+          (incremental (when incremental (string-downcase incremental))))
       (when username
         (setf (database-uri-username uri) username))
       (when password
@@ -54,33 +55,52 @@
             :output-path output
             :receipt-path receipt))))
 
+(defun dump-resultset (stream resultset incremental comparator)
+  (iter (for row = (next-row resultset))
+        (while row)
+        (format stream "~{~A~^~T~}~%" row)
+        (when incremental
+          (for val = (elt row incremental))
+          (reducing val by (lambda (a b) (if (funcall comparator a b) b a))))))
+
+(defun variant< (a b)
+  (cond ((numberp a) (< a b))
+        (t (string< a b))))
+
+(defparameter *type-comparators* (list :datetime   #'string<
+                                       :var-string #'string<
+                                       :text       #'string<
+                                       :null       #'variant<))
+
+(defun get-type-comparator (type)
+  (getf *type-comparators* type #'<))
+
 (defun dump-table (conn table data-stream
-                   &key (columns "*") limit incremental last-value receipt)
-  (let* ((limit-spec (if limit (format nil "LIMIT ~D" limit) ""))
-         (last-value (or last-value (getf receipt :last-value)))
+                   &key (columns "*") limit incremental last-value)
+  (bind ((limit-spec (if limit (format nil "LIMIT ~D" limit) ""))
          (where-spec (if (and incremental last-value)
                          (format nil "WHERE ~A > ?" incremental)
                          ""))
          (parameters (if last-value (list last-value) nil))
          (sql-string (format nil "SELECT ~A FROM ~A ~A ~A"
                              columns table where-spec limit-spec))
-         (resultset  (apply #'query (append (list conn sql-string)
-                                            parameters)))
+         (resultset  (query conn sql-string parameters))
          (metadata   (metadata resultset))
-         (incr-symbol (when incremental (string-to-keyword incremental)))
-         (incr-index (when incremental
-                       (iter (for col in metadata by #'cddr)
-                             (for i from 0)
-                             (finding i such-that (eql col incr-symbol)))))
-         (last-value (iter (for row = (next-row resultset))
-                           (while row)
-                           (format data-stream "~{~A~^~T~}~%" row)
-                           (when incremental
-                             (maximize (elt row incr-index))))))
+         ((idx . ct) (or (when incremental
+                           (iter (for (col . type) in metadata)
+                                 (for i from 0)
+                                 (finding (cons i type)
+                                          such-that (equal col incremental))))
+                         (cons nil nil)))
+         (comparator (get-type-comparator ct))
+         (new-value  (dump-resultset data-stream
+                                     resultset
+                                     idx
+                                     comparator)))
     (list :table table
           :columns columns
           :incremental incremental
-          :last-value last-value)))
+          :last-value (or new-value last-value))))
 
 (defun read-receipt (path)
   (with-open-file (in path :direction :input :if-does-not-exist nil)
@@ -104,15 +124,15 @@
       (with-open-stream (out (if output-path
                                  (open output-path
                                        :direction :output
-                                       :if-exists :overwrite
+                                       :if-exists :supersede
                                        :if-does-not-exist :create)
                                  *standard-output*))
-        (let ((new-receipt (dump-table conn table out
-                                       :columns columns
-                                       :limit limit
-                                       :incremental incremental
-                                       :last-value last-value
-                                       :receipt receipt)))
+        (let* ((last-value (or last-value (getf receipt :last-value)))
+               (new-receipt (dump-table conn table out
+                                        :columns columns
+                                        :limit limit
+                                        :incremental incremental
+                                        :last-value last-value)))
           (when receipt-path
             (write-receipt receipt-path new-receipt)))))))
 

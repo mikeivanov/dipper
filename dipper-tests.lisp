@@ -158,6 +158,16 @@
                       (counting (eql c #\Newline)))))
       (is (equal cnt 1)))))
 
+(test dump-table-incremental-string
+  (with-fixture db-conn ()
+    (let* ((str (with-output-to-string (out)
+                  (dipper::dump-table conn "things" out
+                                      :incremental :name
+                                      :last-value "Thing #1")))
+           (cnt (iter (for c in-string str)
+                      (counting (eql c #\Newline)))))
+      (is (equal cnt 1)))))
+
 (defun slurp-stream (stream)
   (let ((seq (make-array (file-length stream)
                          :element-type 'character
