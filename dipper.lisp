@@ -4,6 +4,7 @@
   (:use :cl :iterate :alexandria :unix-options
         :dipper.util :dipper.dbi :dipper.uri)
   (:import-from :dipper-asd :*dipper-version-string*)
+  (:import-from :osicat :environment-variable)
   (:import-from :metabang-bind :bind))
 
 (in-package :dipper)
@@ -21,31 +22,77 @@
     ((#\u "username") "USERNAME" "Log in to DATABASE as USERNAME")
     ((#\p "password") "PASSWORD" "Log in to DATABASE using PASSWORD")
     ((#\o "output") "PATH" "Store results to PATH. Default: stdout")
-    ((#\r "receipt") "PATH" "Read and write receipt file at PATH.")))
+    ((#\r "receipt") "PATH" "Read and write receipt file at PATH.")
+    ((#\g "config") "PATH" "Read config from PATH.")))
+
+(defun make-config ()
+  (make-hash-table))
+
+(defun read-config (path)
+  (let ((ini (py-configparser:make-config)))
+    (py-configparser:read-files ini (list path))
+    (let ((items (py-configparser:items ini "dipper")))
+      (alist-hash-table (iter (for (k . v) in items)
+                              (collect (cons (string-to-keyword k) v)))))))
+
+(defun set-config (config key value)
+  (setf (gethash config key) value))
+
+(defun get-config (config key &optional default)
+  (gethash key config default))
 
 (defun parse-options (argv)
   (with-cli-options (argv)
       (&parameters database table columns incremental last-value limit
-                   username password output receipt)
-    (unless database
-      (error "Database URI is a required parameter."))
-    (unless table
-      (error "Table name is a required parameter."))
-    (when (and last-value (not incremental))
-      (error "Incremental column is required when last value is specified."))
-    (let ((uri (or (parse-database-uri database)
-                   (error "'~A' is not a valid database URI." database)))
-          (limit (when limit
-                   (or (parse-integer (or limit "0") :junk-allowed t)
-                       (error "'~A' is not a valid limit value" limit))))
-          (columns (or columns "*"))
-          (output (when output (parse-namestring output)))
-          (receipt (when receipt (parse-namestring receipt)))
-          (incremental (when incremental (string-downcase incremental))))
-      (when username
-        (setf (database-uri-username uri) username))
-      (when password
-        (setf (database-uri-password uri) password))
+                   username password output receipt config)
+    ;; TODO: refactor it
+    (let* ((config (or config
+                       (environment-variable "DIPPER_CONFIG")))
+           (cfg (if config
+                   (read-config (parse-namestring config))
+                   (make-config)))
+           (database (or database
+                         (get-config cfg :database)
+                         (environment-variable "DIPPER_DATABASE")
+                         (error "Database URI is not specified.")))
+           (table (or table
+                      (get-config cfg :table)
+                      (environment-variable "DIPPER_TABLE")
+                      (error "Table name is not specified.")))
+           (last-value (or last-value
+                           (get-config cfg :last-value)
+                           (environment-variable "DIPPER_LAST_VALUE")))
+           (incremental (or incremental
+                            (get-config cfg :incremental)
+                            (environment-variable "DIPPER_INCREMENTAL")
+                            (when last-value
+                              (error "Incremental column should be specified if the last value is given."))))
+           (limit (let ((limit (or limit
+                                   (get-config cfg :limit)
+                                   (environment-variable "DIPPER_LIMIT"))))
+                    (when limit
+                      (or (parse-integer limit :junk-allowed t)
+                          (error "'~A' is not a valid limit value" limit)))))
+           (columns (or columns
+                        (get-config cfg :columns)
+                        (environment-variable "DIPPER_COLUMNS")
+                        "*"))
+           (output (let ((output (or output
+                                     (get-config cfg :output)
+                                     (environment-variable "DIPPER_OUTPUT"))))
+                     (when output (parse-namestring output))))
+           (incremental (let ((incremental (or incremental
+                                               (get-config cfg :incremental)
+                                               (environment-variable "DIPPER_INCREMENTAL"))))
+                          (when incremental (string-downcase incremental))))
+           (receipt (let ((receipt (or receipt
+                                       (get-config cfg :receipt)
+                                       (environment-variable "DIPPER_RECEIPT"))))
+                      (when receipt (parse-namestring receipt))))
+           (uri (or (parse-database-uri database
+                                        :override (list :username username
+                                                        :password password))
+                    (error "'~A' is not a valid database URI." database))))
       (list :uri uri
             :table table
             :columns columns
@@ -96,6 +143,7 @@
                                      resultset
                                      idx
                                      comparator)))
+    ;; TODO: should I care about receipts here?
     (list :table table
           :columns columns
           :incremental incremental
