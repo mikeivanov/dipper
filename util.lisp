@@ -13,13 +13,6 @@
 
 (in-package :dipper.util)
 
-(defmacro let-or ((&rest forms) &body body)
-  `(let* ((_ nil)
-          ,@(iter (for (var form else) in forms)
-                  (collect `(,var (or ,form ,else)))))
-     (declare (ignore _))
-     ,@body))
-
 (defun alist-get (key alist &key (test #'eql))
   (cdr (assoc key alist :test test)))
 
@@ -42,14 +35,3 @@
 (defmacro with-accessors-in ((prefix slots object) &body body)
   `(bind (((:structure ,prefix ,@slots) ,object))
      ,@body))
-
-(defun process-argv ()
-  "list of tokens passed in at the cli"
-  #+:sbcl (rest sb-ext:*posix-argv*)
-  #+:ccl (rest ccl:*command-line-argument-list*)
-  #+:clisp (rest ext:*args*)
-  #+:lispworks (rest system:*line-arguments-list*)
-  #+:cmu (rest extensions:*command-line-words*)
-  #+:ecl (rest (ext:command-args))
-  )
-
