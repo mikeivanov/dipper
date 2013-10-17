@@ -2,7 +2,8 @@
 
 (defpackage :dipper-tests
   (:use :cl :fiveam :iterate :osicat)
-  (:import-from :metabang-bind :bind))
+  (:import-from :metabang-bind :bind)
+  (:import-from :alexandria :plist-hash-table))
 
 (in-package :dipper-tests)
 
@@ -45,56 +46,78 @@
                                              :path "/db"
                                              :raw "mysql://user:123@host:1234/db"))))
 
+(test parse-database-uri-override
+  (let ((uri (dipper.uri::parse-database-uri "mysql://user@host"
+                                             :override (list :username "mr.x"))))
+    (is (equal (dipper.uri::database-uri-username uri) "mr.x"))))
+
 (test parse-options
-  (bind (((:plist uri table columns limit)
-          (dipper::parse-options '("--database" "mysql://host/db"
-                                   "--table" "table1"))))
-    (is (equalp uri (dipper.uri::make-database-uri :scheme "mysql"
-                                                   :host "host"
-                                                   :path "/db"
-                                                   :raw "mysql://host/db")))
-    (is (equal table "table1"))
-    (is (equal columns "*"))
-    (is (null limit))))
+  (let ((options (dipper::parse-options '("--database" "mysql://host/db"
+                                          "--table" "table1"))))
+    (is (typep options 'hash-table))
+    (is (equal (gethash :database options) "mysql://host/db"))
+    (is (equal (gethash :table options) "table1"))
+    (is (equal (gethash :username options) nil))))
 
-(test parse-options-username
-  (bind (((:plist uri)
-          (dipper::parse-options '("--database" "mysql://user1@host/db"
-                                   "--table" "table1"
-                                   "--username" "user2"))))
-    (is (equal "user2" (dipper.uri:database-uri-username uri)))))
-
-(test parse-options-passwd
-  (bind (((:plist uri)
-          (dipper::parse-options '("--database" "mysql://user:passwd@host/db"
-                                   "--table" "table1"
-                                   "--password" "PASSWD"))))
-    (is (equal "PASSWD" (dipper.uri:database-uri-password uri)))))
-
-(test parse-options-output
-  (bind (((:plist output-path)
-          (dipper::parse-options '("--database" "mysql://user:passwd@host/db"
-                                   "--table" "table1"
-                                   "--output" "outfile"))))
-    (is (equal #p"outfile" output-path))))
-
-(test parse-options-receipt
-  (bind (((:plist receipt-path)
-          (dipper::parse-options '("--database" "mysql://user:passwd@host/db"
-                                   "--table" "table1"
-                                   "--receipt" "rfile"))))
-    (is (equal #p"rfile" receipt-path))))
-
-(test parse-options-requires-table
-  (signals error
-    (dipper::parse-options '("--database" "mysql://host/db")))
-  (signals error
-    (dipper::parse-options '("--table" "foo"))))
+(test make-config
+  (let ((config (dipper::make-config '("--database" "mysql://host/db"
+                                       "--table" "table1"))))
+    (is (equal (dipper::getconf config :database) "mysql://host/db"))
+    (is (equal (dipper::getconf config :table) "table1"))
+    (is (equal (dipper::getconf config :incremental) nil))))
 
 (defun make-temp-dir ()
   (let* ((name (format nil "/tmp/dipper-test-~A/" (uuid:make-v4-uuid)))
          (path (parse-namestring name)))
     (ensure-directories-exist path)))
+
+(def-fixture sandbox ()
+  (let ((sandbox (make-temp-dir)))
+    (&body)
+    (delete-directory-and-files sandbox)))
+
+(test make-config-precedence
+  (with-fixture sandbox ()
+    (let ((cfg-path (merge-pathnames #p"cfg" sandbox)))
+      (with-open-file (cfg cfg-path
+                           :direction :output
+                           :if-does-not-exist :create)
+        (format cfg "[dipper]~%database=ini~%table=ini~%incremental=ini~%"))
+      (let ((config (dipper::make-config (list "--database" "arg"
+                                               "--table" "arg"
+                                               "--limit" "arg"
+                                               "--config" (namestring cfg-path)))))
+        (setf (environment-variable "DIPPER_LIMIT") "env")
+        (setf (environment-variable "DIPPER_RECEIPT") "env")
+        (unwind-protect
+             (progn
+               (is (equal (dipper::getconf config :database) "arg"))
+               (is (equal (dipper::getconf config :table) "arg"))
+               (is (equal (dipper::getconf config :limit) "arg"))
+               (is (equal (dipper::getconf config :incremental) "ini"))
+               (is (equal (dipper::getconf config :receipt) "env"))
+               (is (equal (dipper::getconf config :last-value) nil)))
+          (progn
+            (makunbound-environment-variable "DIPPER_LIMIT")
+            (makunbound-environment-variable "DIPPER_RECEIPT")))))))
+
+(test prepare-parameters
+  (let* ((config (plist-hash-table '(:database "mysql://host/db"
+                                     :table "table1"
+                                     :output "outfile"
+                                     :receipt "recfile")))
+         (params (dipper::prepare-parameters config)))
+    (is (typep (getf params :uri) 'dipper.uri::database-uri))
+    (is (equal (getf params :table) "table1"))
+    (is (equal (getf params :output-path) #p"outfile"))
+    (is (equal (getf params :receipt-path) #p"recfile"))
+    (is (equal (getf params :incremental) nil))))
+
+(test prepare-parameters-requires-table
+  (signals error
+    (dipper::prepare-parameters (plist-hash-table '(:database "mysql://host/db"))))
+  (signals error
+    (dipper::prepare-parameters (plist-hash-table '(:table "table")))))
 
 (defun make-test-db (path)
   (let ((db (sqlite:connect path)))

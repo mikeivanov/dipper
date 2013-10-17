@@ -13,82 +13,88 @@
   ((message :initarg :message :reader dipper-error-message)))
 
 (defparameter +options+
-  `(((#\d "database") "DATABASE" "Database connection")
-    ((#\t "table") "TABLE" "Table name")
-    ((#\c "columns") "COL1,COL2,...,COLN" "A comma-separated column list")
-    ((#\i "incremental") "COLUMN" "Do an incremental update using this column")
-    ((#\v "last-value") "VALUE" "The last seen value in the incremental column")
-    ((#\l "limit") "N" "Limit the results to only N first rows.")
-    ((#\u "username") "USERNAME" "Log in to DATABASE as USERNAME")
-    ((#\p "password") "PASSWORD" "Log in to DATABASE using PASSWORD")
-    ((#\o "output") "PATH" "Store results to PATH. Default: stdout")
-    ((#\r "receipt") "PATH" "Read and write receipt file at PATH.")
-    ((#\g "config") "PATH" "Read config from PATH.")))
-
-(defun make-config ()
-  (make-hash-table))
-
-(defun read-config (path)
-  (let ((ini (py-configparser:make-config)))
-    (py-configparser:read-files ini (list path))
-    (let ((items (py-configparser:items ini "dipper")))
-      (alist-hash-table (iter (for (k . v) in items)
-                              (collect (cons (string-to-keyword k) v)))))))
-
-(defun set-config (config key value)
-  (setf (gethash config key) value))
-
-(defun get-config (config key &optional default)
-  (gethash key config default))
+  `((("database") "DATABASE" "Database connection")
+    (("table") "TABLE" "Table name")
+    (("columns") "COL1,COL2,...,COLN" "A comma-separated column list")
+    (("incremental") "COLUMN" "Do an incremental update using this column")
+    (("last-value") "VALUE" "The last seen value in the incremental column")
+    (("limit") "N" "Limit the results to only N first rows.")
+    (("username") "USERNAME" "Log in to DATABASE as USERNAME")
+    (("password") "PASSWORD" "Log in to DATABASE using PASSWORD")
+    (("output") "PATH" "Store results to PATH. Default: stdout")
+    (("receipt") "PATH" "Read and write receipt file at PATH.")
+    (("config") "PATH" "Read config from PATH.")))
 
 (defun parse-options (argv)
-  (with-cli-options (argv)
-      (&parameters database table columns incremental last-value limit
-                   username password output receipt config)
-    ;; TODO: refactor it
-    (let* ((config (or config
-                       (environment-variable "DIPPER_CONFIG")))
-           (cfg (if config
-                   (read-config (parse-namestring config))
-                   (make-config)))
-           (database (or database
-                         (get-config cfg :database)
-                         (environment-variable "DIPPER_DATABASE")
-                         (error "Database URI is not specified.")))
-           (table (or table
-                      (get-config cfg :table)
-                      (environment-variable "DIPPER_TABLE")
-                      (error "Table name is not specified.")))
-           (last-value (or last-value
-                           (get-config cfg :last-value)
-                           (environment-variable "DIPPER_LAST_VALUE")))
-           (incremental (or incremental
-                            (get-config cfg :incremental)
-                            (environment-variable "DIPPER_INCREMENTAL")
-                            (when last-value
-                              (error "Incremental column should be specified if the last value is given."))))
-           (limit (let ((limit (or limit
-                                   (get-config cfg :limit)
-                                   (environment-variable "DIPPER_LIMIT"))))
-                    (when limit
-                      (or (parse-integer limit :junk-allowed t)
-                          (error "'~A' is not a valid limit value" limit)))))
-           (columns (or columns
-                        (get-config cfg :columns)
-                        (environment-variable "DIPPER_COLUMNS")
-                        "*"))
-           (output (let ((output (or output
-                                     (get-config cfg :output)
-                                     (environment-variable "DIPPER_OUTPUT"))))
-                     (when output (parse-namestring output))))
-           (incremental (let ((incremental (or incremental
-                                               (get-config cfg :incremental)
-                                               (environment-variable "DIPPER_INCREMENTAL"))))
-                          (when incremental (string-downcase incremental))))
-           (receipt (let ((receipt (or receipt
-                                       (get-config cfg :receipt)
-                                       (environment-variable "DIPPER_RECEIPT"))))
-                      (when receipt (parse-namestring receipt))))
+  (let ((options (make-hash-table))
+        (names (iter (for ((name)) in +options+)
+                     (collect name))))
+    (flet ((next-option (name value)
+             (unless value
+               (error "Option '~A' must have a value" name))
+             (let ((key (string-to-keyword name)))
+               (setf (gethash key options) value)))
+           (unexpected (arg)
+             (error "Unexpected argument '~A'." arg)))
+      (map-parsed-options argv () names #'next-option #'unexpected))
+    options))
+
+(defun read-ini-file (path)
+  (let ((ini (py-configparser:make-config)))
+    (py-configparser:read-files ini (list path))
+    ini))
+
+(defgeneric getconf (thing key &optional default))
+
+(defmethod getconf ((config py-configparser:config) key &optional default)
+  (let ((name (symbol-name key)))
+    (if (py-configparser:has-option-p config "dipper" name)
+        (py-configparser:get-option config "dipper" name)
+        default)))
+
+(defmethod getconf ((hash hash-table) key &optional default)
+  (gethash key hash default))
+
+(defmethod getconf ((configs list) key &optional default)
+  (if-let ((config (first configs)))
+    (or (getconf config key)
+        (getconf (rest configs) key default))
+    default))
+
+(defmethod getconf ((env (eql :env)) key &optional default)
+  (let ((var (format nil "DIPPER_~A"
+                     (string-upcase (symbol-name key)))))
+    (or (environment-variable var)
+         default)))
+
+(defmethod getconf ((thing t) key &optional default)
+  (declare (ignore thing)
+           (ignore key))
+  default)
+
+(defun prepare-parameters (config)
+  (macrolet ((param (var &key then else)
+               `(let ((,var (getconf config ,(string-to-keyword (symbol-name var)))))
+                  (or (when ,var ,(or then var))
+                      ,(or else nil)))))
+    (let* ((database (param database
+                            :else (error "Database URI is not specified.")))
+           (table (param table
+                         :else (error "Table name is not specified.")))
+           (limit (param limit
+                         :then (or (parse-integer limit :junk-allowed t)
+                                   (error "'~A' is not a valid limit value" limit))))
+           (columns (param columns :else "*"))
+           (output-path (param output
+                               :then (parse-namestring output)))
+           (incremental (param incremental
+                               :then (string-downcase incremental)))
+           (last-value (param last-value
+                              :then (unless incremental
+                                      (error "Incremental is not specified"))))
+           (receipt-path (param receipt :then (parse-namestring receipt)))
+           (username (param username))
+           (password (param password))
            (uri (or (parse-database-uri database
                                         :override (list :username username
                                                         :password password))
@@ -99,8 +105,8 @@
             :incremental incremental
             :last-value last-value
             :limit limit
-            :output-path output
-            :receipt-path receipt))))
+            :output-path output-path
+            :receipt-path receipt-path))))
 
 (defun dump-resultset (stream resultset incremental comparator)
   (iter (for row = (next-row resultset))
@@ -163,9 +169,18 @@
                        :if-exists :rename)
     (yason:encode-plist receipt out)))
 
+(defun make-config (argv)
+  (let* ((options (parse-options argv))
+         (config-path (getconf (list options :env) :config))
+         (ini (when config-path
+                (read-ini-file config-path))))
+    (list options ini :env)))
+
 (defun main (&rest argv)
-  (bind (((:plist uri table columns limit incremental
-                  last-value output-path receipt-path) (parse-options argv))
+  (bind ((config (make-config argv))
+         ((:plist uri table columns limit incremental
+                  last-value output-path
+                  receipt-path) (prepare-parameters config))
          (receipt (when receipt-path (read-receipt receipt-path))))
     (with-connection (conn uri)
       (with-open-stream (out (if output-path
