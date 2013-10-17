@@ -26,14 +26,17 @@
                ")?"                          ; end
                "(?:(/?[^/][^:]+))?$"))       ; path
 
-(defun parse-database-uri (uri)
+(defun parse-database-uri (uri &key override)
   (with-re-match ((scheme subprotocol username password host port path)
                   *database-uri-regex* uri)
-    (make-database-uri :scheme scheme
-                       :subprotocol subprotocol
-                       :host host
-                       :port port
-                       :path path
-                       :password password
-                       :username username
-                       :raw uri)))
+    (macrolet ((getv (var)
+                 `(or (getf override ,(string-to-keyword (symbol-name var)))
+                      ,var)))
+      (make-database-uri :scheme (getv scheme)
+                         :subprotocol (getv subprotocol)
+                         :host (getv host)
+                         :port (getv port)
+                         :path (getv path)
+                         :password (getv password)
+                         :username (getv username)
+                         :raw (getv uri)))))
