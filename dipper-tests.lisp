@@ -113,6 +113,15 @@
     (is (equal (getf params :receipt-path) #p"recfile"))
     (is (equal (getf params :incremental) nil))))
 
+(test prepare-parameters-default
+  (let* ((config (plist-hash-table '(:database "mysql://host/db"
+                                     :table "table1"
+                                     :incremental "DEFAULT"
+                                     :columns "DEFAULT")))
+         (params (dipper::prepare-parameters config)))
+    (is (equal (getf params :incremental) nil))
+    (is (equal (getf params :columns) "*"))))
+
 (test prepare-parameters-requires-table
   (signals error
     (dipper::prepare-parameters (plist-hash-table '(:database "mysql://host/db"))))
