@@ -1,6 +1,6 @@
 * TODO
 - [X] don't close stdout!
-- [ ] return -1 on errors
+- [X] return -1 on errors
 - [ ] return 1 if no changes?
 - [X] add --config (ini)
 - [ ] convert receipts to ini, get rid of json

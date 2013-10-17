@@ -13,7 +13,8 @@
   ((message :initarg :message :reader dipper-error-message)))
 
 (defparameter +options+
-  `((("database") "DATABASE" "Database connection")
+  `((("help") nil "Help saves the world")
+    (("database") "DATABASE" "Database connection")
     (("table") "TABLE" "Table name")
     (("columns") "COL1,COL2,...,COLN" "A comma-separated column list")
     (("incremental") "COLUMN" "Do an incremental update using this column")
@@ -27,8 +28,12 @@
 
 (defun parse-options (argv)
   (let ((options (make-hash-table))
-        (names (iter (for ((name)) in +options+)
-                     (collect name))))
+        (optional ())
+        (boolean ()))
+    (iter (for ((name) opt) in +options+)
+          (if opt
+              (push name optional)
+              (push name boolean)))
     (flet ((next-option (name value)
              (unless value
                (error "Option '~A' must have a value" name))
@@ -36,7 +41,7 @@
                (setf (gethash key options) value)))
            (unexpected (arg)
              (error "Unexpected argument '~A'." arg)))
-      (map-parsed-options argv () names #'next-option #'unexpected))
+      (map-parsed-options argv boolean optional #'next-option #'unexpected))
     options))
 
 (defun read-ini-file (path)
@@ -170,34 +175,36 @@
                        :if-exists :rename)
     (yason:encode-plist receipt out)))
 
-(defun make-config (argv)
-  (let* ((options (parse-options argv))
-         (config-path (getconf (list options :env) :config))
+(defun make-config (options)
+  (let* ((config-path (getconf (list options :env) :config))
          (ini (when config-path
                 (read-ini-file config-path))))
     (list options ini :env)))
 
 (defun main (&rest argv)
-  (bind ((config (make-config argv))
-         ((:plist uri table columns limit incremental
-                  last-value output-path
-                  receipt-path) (prepare-parameters config))
-         (receipt (when receipt-path (read-receipt receipt-path))))
-    (with-connection (conn uri)
-      (with-open-stream (out (if output-path
-                                 (open output-path
-                                       :direction :output
-                                       :if-exists :supersede
-                                       :if-does-not-exist :create)
-                                 (make-synonym-stream '*standard-output*)))
-        (let* ((last-value (or last-value (getf receipt :last-value)))
-               (new-receipt (dump-table conn table out
-                                        :columns columns
-                                        :limit limit
-                                        :incremental incremental
-                                        :last-value last-value)))
-          (when receipt-path
-            (write-receipt receipt-path new-receipt)))))))
+  (let ((options (parse-options argv)))
+    (if (getconf options :help)
+      (usage)
+      (bind ((config (make-config options))
+             ((:plist uri table columns limit incremental
+                      last-value output-path
+                      receipt-path) (prepare-parameters config))
+             (receipt (when receipt-path (read-receipt receipt-path))))
+        (with-connection (conn uri)
+          (with-open-stream (out (if output-path
+                                     (open output-path
+                                           :direction :output
+                                           :if-exists :supersede
+                                           :if-does-not-exist :create)
+                                     (make-synonym-stream '*standard-output*)))
+            (let* ((last-value (or last-value (getf receipt :last-value)))
+                   (new-receipt (dump-table conn table out
+                                            :columns columns
+                                            :limit limit
+                                            :incremental incremental
+                                            :last-value last-value)))
+              (when receipt-path
+                (write-receipt receipt-path new-receipt)))))))))
 
 (defun usage ()
   (print-usage-summary "Parameters:~%~@{~A~%~}~%" +options+))
@@ -207,4 +214,4 @@
       (apply #'main (cli-options))
     (error (e)
       (format *error-output* "Dipper: ~A~%~%" e)
-      (usage))))
+      (terminate -1))))

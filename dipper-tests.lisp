@@ -60,8 +60,9 @@
     (is (equal (gethash :username options) nil))))
 
 (test make-config
-  (let ((config (dipper::make-config '("--database" "mysql://host/db"
-                                       "--table" "table1"))))
+  (let* ((options (dipper::parse-options '("--database" "mysql://host/db"
+                                          "--table" "table1")))
+         (config (dipper::make-config options)))
     (is (equal (dipper::getconf config :database) "mysql://host/db"))
     (is (equal (dipper::getconf config :table) "table1"))
     (is (equal (dipper::getconf config :incremental) nil))))
@@ -83,10 +84,11 @@
                            :direction :output
                            :if-does-not-exist :create)
         (format cfg "[dipper]~%database=ini~%table=ini~%incremental=ini~%"))
-      (let ((config (dipper::make-config (list "--database" "arg"
-                                               "--table" "arg"
-                                               "--limit" "arg"
-                                               "--config" (namestring cfg-path)))))
+      (let* ((options (dipper::parse-options (list "--database" "arg"
+                                                   "--table" "arg"
+                                                   "--limit" "arg"
+                                                   "--config" (namestring cfg-path))))
+             (config (dipper::make-config options)))
         (setf (environment-variable "DIPPER_LIMIT") "env")
         (setf (environment-variable "DIPPER_RECEIPT") "env")
         (unwind-protect
@@ -251,6 +253,12 @@
       (with-open-file (f outpath :direction :input)
         (is (equal (slurp-stream f)
                    (format nil "2~TThing #2~%")))))))
+
+(test help
+  (let ((str (with-output-to-string (out)
+               (let ((*standard-output* out))
+                 (dipper::main "--help")))))
+    (is (equal (subseq str 0 11) "Parameters:"))))
 
 (eval-when (:execute)
   (let ((*DEBUG-ON-ERROR* T))

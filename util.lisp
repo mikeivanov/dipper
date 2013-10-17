@@ -9,7 +9,8 @@
            :symbol-to-keyword
            :alist-get :alist-get-str
            :with-re-match
-           :with-accessors-in))
+           :with-accessors-in
+           :terminate))
 
 (in-package :dipper.util)
 
@@ -35,3 +36,14 @@
 (defmacro with-accessors-in ((prefix slots object) &body body)
   `(bind (((:structure ,prefix ,@slots) ,object))
      ,@body))
+
+(defun terminate (status)
+  #+sbcl       (sb-ext:quit :unix-status status) ; SBCL
+  #+ccl        (ccl:quit status)                 ; Clozure CL
+  #+clisp      (ext:quit status)                 ; GNU CLISP
+  #+cmu        (unix:unix-exit status)           ; CMUCL
+  #+abcl       (ext:quit :status status)         ; Armed Bear CL
+  #+allegro    (excl:exit status :quiet t)       ; Allegro CL
+  #+lispworks  (lispworks:quit :status status)   ; LispWorks
+  #+ecl        (ext:quit status)                 ; ECL
+  (cl-user::quit))
