@@ -1,9 +1,10 @@
 * TODO
 - [X] don't close stdout!
 - [X] return -1 on errors
-- [ ] return 1 if no changes?
 - [X] add --config (ini)
+- [ ] --help shows SBCL help when compiled
+- [ ] interrupt -> term
+- [ ] add --null-as
 - [ ] convert receipts to ini, get rid of json
-- [ ] add --receipts-dir
 - [ ] add --header
-- [ ] add --separator
+- [ ] add --separator (or --format=cvs/dat ?)
