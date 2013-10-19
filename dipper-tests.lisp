@@ -83,21 +83,21 @@
       (with-open-file (cfg cfg-path
                            :direction :output
                            :if-does-not-exist :create)
-        (format cfg "[dipper]~%database=ini~%table=ini~%incremental=ini~%"))
-      (let* ((options (dipper::parse-options (list "--database" "arg"
-                                                   "--table" "arg"
-                                                   "--limit" "arg"
+        (format cfg "[dipper]~%database=ini-db~%table=ini-able~%incremental=ini-incr~%"))
+      (let* ((options (dipper::parse-options (list "--database" "arg-db"
+                                                   "--table" "arg-table"
+                                                   "--limit" "arg-limit"
                                                    "--config" (namestring cfg-path))))
              (config (dipper::make-config options)))
-        (setf (environment-variable "DIPPER_LIMIT") "env")
-        (setf (environment-variable "DIPPER_RECEIPT") "env")
+        (setf (environment-variable "DIPPER_LIMIT") "env-limit")
+        (setf (environment-variable "DIPPER_RECEIPT") "env-receipt")
         (unwind-protect
              (progn
-               (is (equal (dipper::getconf config :database) "arg"))
-               (is (equal (dipper::getconf config :table) "arg"))
-               (is (equal (dipper::getconf config :limit) "arg"))
-               (is (equal (dipper::getconf config :incremental) "ini"))
-               (is (equal (dipper::getconf config :receipt) "env"))
+               (is (equal (dipper::getconf config :database) "arg-db"))
+               (is (equal (dipper::getconf config :table) "arg-table"))
+               (is (equal (dipper::getconf config :limit) "arg-limit"))
+               (is (equal (dipper::getconf config :incremental) "ini-incr"))
+               (is (equal (dipper::getconf config :receipt) "env-receipt"))
                (is (equal (dipper::getconf config :last-value) nil)))
           (progn
             (makunbound-environment-variable "DIPPER_LIMIT")
