@@ -4,8 +4,7 @@
   (:use :cl :iterate :alexandria)
   (:import-from :cl-ppcre :scan-to-strings)
   (:import-from :metabang-bind :bind)
-  (:export :let-or
-           :string-to-keyword
+  (:export :string-to-keyword
            :symbol-to-keyword
            :alist-get :alist-get-str
            :with-re-match
