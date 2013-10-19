@@ -4,7 +4,6 @@
   (:use :cl :iterate :alexandria :unix-options
         :dipper.util :dipper.dbi :dipper.uri)
   (:import-from :dipper-asd :*dipper-version-string*)
-  (:import-from :osicat :environment-variable)
   (:import-from :metabang-bind :bind))
 
 (in-package :dipper)
@@ -69,8 +68,7 @@
 (defmethod getconf ((env (eql :env)) key &optional default)
   (let ((var (format nil "DIPPER_~A"
                      (string-upcase (symbol-name key)))))
-    (or (environment-variable var)
-         default)))
+    (getenv var default)))
 
 (defmethod getconf ((thing t) key &optional default)
   (declare (ignore thing)
