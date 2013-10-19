@@ -96,3 +96,9 @@ Usage
         --output=PATH                  Store results to PATH. Default: stdout
         --receipt=PATH                 Read and write receipt file at PATH
         --config=PATH                  Read config from PATH
+
+
+Installation
+------------
+
+Coming soon...
