@@ -25,14 +25,14 @@
   (is (equalp (dipper.uri::parse-database-uri "mysql://host:1234/db")
               (dipper.uri::make-database-uri :scheme "mysql"
                                              :host "host"
-                                             :port "1234"
+                                             :port 1234
                                              :path "/db"
                                              :raw "mysql://host:1234/db")))
 
   (is (equalp (dipper.uri::parse-database-uri "mysql://user@host:1234/db")
               (dipper.uri::make-database-uri :scheme "mysql"
                                              :host "host"
-                                             :port "1234"
+                                             :port 1234
                                              :username "user"
                                              :path "/db"
                                              :raw "mysql://user@host:1234/db")))
@@ -40,7 +40,7 @@
   (is (equalp (dipper.uri::parse-database-uri "mysql://user:123@host:1234/db")
               (dipper.uri::make-database-uri :scheme "mysql"
                                              :host "host"
-                                             :port "1234"
+                                             :port 1234
                                              :username "user"
                                              :password "123"
                                              :path "/db"
