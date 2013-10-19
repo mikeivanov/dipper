@@ -8,6 +8,8 @@
 
 (in-package :dipper)
 
+(cl-interpol:enable-interpol-syntax)
+
 (define-condition dipper-error (error)
   ((message :initarg :message :reader dipper-error-message)))
 
@@ -115,7 +117,7 @@
 (defun dump-resultset (stream resultset incremental comparator)
   (iter (for row = (next-row resultset))
         (while row)
-        (format stream "~{~A~^~T~}~%" row)
+        (format stream #?"~{~A~^\t~}~%" row)
         (when incremental
           (for val = (elt row incremental))
           (reducing val by (lambda (a b) (if (funcall comparator a b) b a))))))

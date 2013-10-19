@@ -16,7 +16,7 @@
   :version #.*dipper-version-string*
   :depends-on (:iterate :cl-ppcre :dbi :dbd-mysql :dbd-sqlite3
                :unix-options :alexandria :metabang-bind :yason
-               :py-configparser)
+               :py-configparser :cl-interpol)
   :components ((:file "util")
                (:file "uri")
                (:file "dbi")

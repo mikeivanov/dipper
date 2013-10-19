@@ -7,6 +7,8 @@
 
 (in-package :dipper-tests)
 
+(cl-interpol:enable-interpol-syntax)
+
 (def-suite :dipper)
 (in-suite :dipper)
 
@@ -165,14 +167,14 @@
     (let ((str (with-output-to-string (out)
                  (dipper::dump-table conn "things" out))))
       (is (equal str
-                 (format nil "1~TThing #1~%2~TThing #2~%"))))))
+                 (format nil "1~CThing #1~%2~CThing #2~%" #\Tab #\Tab))))))
 
 (test dump-table-projection
   (with-fixture db-conn ()
     (let ((str (with-output-to-string (out)
                  (dipper::dump-table conn "things" out :columns "id"))))
       (is (equal str
-                 (format nil "1~%2~%"))))))
+                 (format nil "1~%2~%" #\Tab))))))
 
 (test dump-table-limit
   (with-fixture db-conn ()
@@ -217,7 +219,7 @@
                     "--output" (namestring outpath))
       (with-open-file (f outpath :direction :input)
         (is (equal (slurp-stream f)
-                   (format nil "1~TThing #1~%2~TThing #2~%")))))))
+                   (format nil #?"1\tThing #1~%2\tThing #2~%")))))))
 
 (test main-receipt-write
   (with-fixture db ()
@@ -252,7 +254,7 @@
                     "--receipt" (namestring rcppath))
       (with-open-file (f outpath :direction :input)
         (is (equal (slurp-stream f)
-                   (format nil "2~TThing #2~%")))))))
+                   (format nil #?"2\tThing #2~%")))))))
 
 (test help
   (let ((str (with-output-to-string (out)
