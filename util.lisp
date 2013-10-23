@@ -4,6 +4,7 @@
   (:import-from :cl-ppcre :scan-to-strings)
   (:import-from :metabang-bind :bind)
   (:export :string-to-keyword
+           :keyword-to-string
            :symbol-to-keyword
            :alist-get :alist-get-str
            :with-re-match
@@ -15,6 +16,9 @@
 
 (defun string-to-keyword (string)
   (make-keyword (string-upcase string)))
+
+(defun keyword-to-string (keyword)
+  (string-downcase (symbol-name keyword)))
 
 (defun symbol-to-keyword (symbol)
   (string-to-keyword (symbol-name symbol)))

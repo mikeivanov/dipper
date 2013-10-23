@@ -46,9 +46,17 @@
     options))
 
 (defun read-ini-file (path)
-  (let ((ini (py-configparser:make-config)))
-    (py-configparser:read-files ini (list path))
-    ini))
+  (when (probe-file path)
+    (let ((ini (py-configparser:make-config)))
+      (py-configparser:read-files ini (list path))
+      ini)))
+
+(defun write-ini-file (ini path)
+  (with-open-file (out path
+                       :direction :output
+                       :if-exists :supersede
+                       :if-does-not-exist :create)
+    (py-configparser:write-stream ini out)))
 
 (defgeneric getconf (thing key &optional default))
 
@@ -162,18 +170,18 @@
           :last-value (or new-value last-value))))
 
 (defun read-receipt (path)
-  (with-open-file (in path :direction :input :if-does-not-exist nil)
-    (when in
-      (yason:parse in
-                   :object-as :plist
-                   :object-key-fn #'string-to-keyword))))
+  (when-let ((ini (read-ini-file path)))
+    (iter (for (option . value) in (py-configparser:items ini "receipt"))
+          (appending (list (string-to-keyword option) value)))))
 
-(defun write-receipt (path receipt)
-  (with-open-file (out path
-                       :direction :output
-                       :if-does-not-exist :create
-                       :if-exists :rename)
-    (yason:encode-plist receipt out)))
+(defun write-receipt (path items-plist)
+  (let ((ini (py-configparser:make-config)))
+    (py-configparser:add-section ini "receipt")
+    (iter (for (option value) on items-plist by #'cddr)
+          (py-configparser:set-option ini "receipt"
+                                      (keyword-to-string option)
+                                      value))
+    (write-ini-file ini path)))
 
 (defun make-config (options)
   (let* ((config-path (getconf (list options :env) :config))
