@@ -9,7 +9,7 @@
            :alist-get :alist-get-str
            :with-re-match
            :with-accessors-in
-           :terminate
+           :terminate-process
            :getenv))
 
 (in-package :dipper.util)
@@ -37,7 +37,7 @@
   `(bind (((:structure ,prefix ,@slots) ,object))
      ,@body))
 
-(defun terminate (status)
+(defun terminate-process (status)
   #+sbcl       (sb-ext:quit :unix-status status) ; SBCL
   #+ccl        (ccl:quit status)                 ; Clozure CL
   #+clisp      (ext:quit status)                 ; GNU CLISP

@@ -214,4 +214,4 @@
       (apply #'main (cli-options))
     (error (e)
       (format *error-output* "Dipper: ~A~%~%" e)
-      (terminate -1))))
+      (terminate-process -1))))
