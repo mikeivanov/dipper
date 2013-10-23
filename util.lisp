@@ -14,12 +14,6 @@
 
 (in-package :dipper.util)
 
-(defun alist-get (key alist &key (test #'eql))
-  (cdr (assoc key alist :test test)))
-
-(defun alist-get-str (key alist)
-  (cdr (assoc key alist :test #'equal)))
-
 (defun string-to-keyword (string)
   (make-keyword (string-upcase string)))
 
