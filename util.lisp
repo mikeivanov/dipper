@@ -1,5 +1,4 @@
 (in-package :cl-user)
-
 (defpackage :dipper.util
   (:use :cl :iterate :alexandria)
   (:import-from :cl-ppcre :scan-to-strings)
@@ -32,7 +31,7 @@
      ,@body))
 
 (defun terminate-process (status)
-  #+sbcl       (sb-ext:quit :unix-status status) ; SBCL
+  #+sbcl       (sb-ext:exit :code status)        ; SBCL
   #+ccl        (ccl:quit status)                 ; Clozure CL
   #+clisp      (ext:quit status)                 ; GNU CLISP
   #+cmu        (unix:unix-exit status)           ; CMUCL
@@ -40,7 +39,7 @@
   #+allegro    (excl:exit status :quiet t)       ; Allegro CL
   #+lispworks  (lispworks:quit :status status)   ; LispWorks
   #+ecl        (ext:quit status)                 ; ECL
-  (cl-user::quit))
+  )
 
 (defun getenv (name &optional default)
     #+CMU
