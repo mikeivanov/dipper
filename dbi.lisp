@@ -55,7 +55,7 @@
 
 (defgeneric metadata- (type query))
 
-(defparameter *mysql-to-dbi-type-map*
+(defparameter *mysql-dbi-type-map*
   (plist-hash-table (list
                       :DECIMAL    :decimal
                       :TINY       :int
@@ -80,7 +80,7 @@
     (iter (for (name . type) in fields)
           (collect (cons (string-downcase name)
                          (gethash (car type)
-                                  *mysql-string-to-type-map*
+                                  *mysql-dbi-type-map*
                                   :string))))))
 
 (defmethod metadata- ((type (eql :sqlite3)) query)

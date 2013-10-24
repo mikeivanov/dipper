@@ -143,6 +143,13 @@
 (defun get-type-comparator (type)
   (getf *type-comparators* type #'<))
 
+(defun format-schema-string (metadata)
+  (iter (for (col . type) in metadata)
+        (reducing (format nil "~A:~A"
+                          col
+                          (keyword-to-string type))
+                  by (lambda (a b) (format nil "~A, ~A" a b)))))
+
 (defun dump-table (conn table data-stream
                    &key (columns "*") limit incremental last-value)
   (bind ((limit-spec (if limit (format nil "LIMIT ~D" limit) ""))
@@ -169,7 +176,8 @@
     (list :table table
           :columns columns
           :incremental incremental
-          :last-value (or new-value last-value))))
+          :last-value (or new-value last-value)
+          :schema (format-schema-string metadata))))
 
 (defun read-receipt (path)
   (when-let ((ini (read-ini-file path)))
