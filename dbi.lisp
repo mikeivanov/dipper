@@ -1,6 +1,6 @@
 (in-package :cl-user)
 (defpackage :dipper.dbi
-  (:use :cl :iterate :dipper.util :dipper.uri)
+  (:use :cl :iterate :dipper.util :dipper.uri :alexandria)
   (:export :with-connection :query :next-row :metadata))
 
 (in-package :dipper.dbi)
@@ -39,10 +39,10 @@
 
 (defgeneric query- (type conn sql &optional parameters))
 
-(defparameter *mysql-type-map* (make-hash-table))
+(defparameter *mysql-string-to-type-map* (make-hash-table))
 
 (defmethod query- ((type (eql :mysql)) conn sql &optional parameters)
-  (let* ((cl-mysql:*type-map* *mysql-type-map*)
+  (let* ((cl-mysql:*type-map* *mysql-string-to-type-map*)
          (statement (dbi:prepare conn sql)))
     (apply #'dbi:execute (cons statement parameters))))
 
@@ -55,12 +55,33 @@
 
 (defgeneric metadata- (type query))
 
+(defparameter *mysql-to-dbi-type-map*
+  (plist-hash-table (list
+                      :DECIMAL    :decimal
+                      :TINY       :int
+                      :SHORT      :int
+                      :LONG       :long
+                      :FLOAT      :float
+                      :DOUBLE     :double
+                      :NULL       :string
+                      :TIMESTAMP  :datetime
+                      :LONGLONG   :long
+                      :INT24      :int
+                      :DATE       :date
+                      :TIME       :time
+                      :DATETIME   :datetime
+                      :YEAR       :int
+                      :NEWDATE    :datetime
+                      :NEWDECIMAL :decimal)))
+
 (defmethod metadata- ((type (eql :mysql)) query)
   (let* ((result (slot-value query 'dbd.mysql::%result))
          (fields (car (cl-mysql::result-set-fields result))))
     (iter (for (name . type) in fields)
           (collect (cons (string-downcase name)
-                         type)))))
+                         (gethash (car type)
+                                  *mysql-string-to-type-map*
+                                  :string))))))
 
 (defmethod metadata- ((type (eql :sqlite3)) query)
   (let* ((statement (dbi.driver:query-prepared query))
@@ -75,6 +96,7 @@
     (metadata- (driver-type conn) query)))
 
 (defun next-row (query)
-  (let ((row (dbi:fetch query)))
-    (iter (for lst on row by #'cddr)
-          (collect (cadr lst)))))
+  (let* ((cl-mysql:*type-map* *mysql-string-to-type-map*))
+    (let ((row (dbi:fetch query)))
+      (iter (for lst on row by #'cddr)
+            (collect (cadr lst))))))
