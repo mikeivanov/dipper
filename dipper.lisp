@@ -130,18 +130,20 @@
           (for val = (elt row incremental))
           (reducing val by (lambda (a b) (if (funcall comparator a b) b a))))))
 
-(defparameter *type-comparators* (list :int      #'<
-                                       :long     #'<
-                                       :float    #'<
-                                       :double   #'<
-                                       :decimal  #'<
-                                       :date     #'string<
-                                       :time     #'string<
-                                       :datetime #'string<
-                                       :string   #'string<))
+(defparameter *type-comparator-map*
+  (plist-hash-table (list :int      #'<
+                          :long     #'<
+                          :float    #'<
+                          :double   #'<
+                          :decimal  #'<
+                          :date     #'string<
+                          :time     #'string<
+                          :datetime #'string<
+                          :string   #'string<)))
 
 (defun get-type-comparator (type)
-  (getf *type-comparators* type #'<))
+  (or (gethash type *type-comparator-map*)
+      (error "Don't know how to compare ~As" type)))
 
 (defun format-schema-string (metadata)
   (iter (for (col . type) in metadata)
