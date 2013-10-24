@@ -138,7 +138,7 @@
                                        :date     #'string<
                                        :time     #'string<
                                        :datetime #'string<
-                                       :string   #'variant<))
+                                       :string   #'string<))
 
 (defun get-type-comparator (type)
   (getf *type-comparators* type #'<))
