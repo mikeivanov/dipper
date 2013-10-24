@@ -87,7 +87,7 @@
 
 (defun prepare-parameters (config)
   (macrolet ((param (var &key then else)
-               `(let* ((,var (getconf config ,(string-to-keyword (symbol-name var))))
+               `(let* ((,var (getconf config ,(symbol-to-keyword var)))
                        (,var (if (equal ,var "DEFAULT") nil ,var)))
                   (or (when ,var ,(or then var))
                       ,(or else nil)))))
