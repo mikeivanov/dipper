@@ -130,13 +130,15 @@
           (for val = (elt row incremental))
           (reducing val by (lambda (a b) (if (funcall comparator a b) b a))))))
 
-(defun variant< (a b)
-  (cond ((numberp a) (< a b))
-        (t (string< a b))))
-
-(defparameter *type-comparators* (list :var-string #'string<
-                                       :text       #'string<
-                                       :null       #'variant<))
+(defparameter *type-comparators* (list :int      #'<
+                                       :long     #'<
+                                       :float    #'<
+                                       :double   #'<
+                                       :decimal  #'<
+                                       :date     #'string<
+                                       :time     #'string<
+                                       :datetime #'string<
+                                       :string   #'variant<))
 
 (defun get-type-comparator (type)
   (getf *type-comparators* type #'<))
