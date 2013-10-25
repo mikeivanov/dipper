@@ -25,6 +25,7 @@
     (("password") "PASSWORD" "Log in to DATABASE using PASSWORD")
     (("output") "PATH" "Store results to PATH. Default: stdout")
     (("receipt") "PATH" "Read and write receipt file at PATH.")
+    (("write-receipt") "PATH" "Override the receipt destination specified by --receipt.")
     (("config") "PATH" "Read config from PATH.")))
 
 (defun parse-options (argv)
@@ -106,7 +107,10 @@
            (last-value (param last-value
                               :then (unless incremental
                                       (error "Incremental is not specified"))))
-           (receipt-path (param receipt :then (parse-namestring receipt)))
+           (read-receipt-path (param receipt :then (parse-namestring receipt)))
+           (write-receipt-path (or (param write-receipt
+                                          :then (parse-namestring write-receipt))
+                                   read-receipt-path))
            (username (param username))
            (password (param password))
            (uri (or (parse-database-uri database
@@ -120,7 +124,8 @@
             :last-value last-value
             :limit limit
             :output-path output-path
-            :receipt-path receipt-path))))
+            :read-receipt-path read-receipt-path
+            :write-receipt-path write-receipt-path))))
 
 (defun dump-resultset (stream resultset incremental comparator)
   (iter (for row = (next-row resultset))
@@ -206,10 +211,11 @@
     (if (getconf options :help)
       (usage)
       (bind ((config (make-config options))
-             ((:plist uri table columns limit incremental
-                      last-value output-path
-                      receipt-path) (prepare-parameters config))
-             (receipt (when receipt-path (read-receipt receipt-path))))
+             ((:plist uri table columns limit incremental last-value
+                      output-path read-receipt-path write-receipt-path)
+              (prepare-parameters config))
+             (receipt (when read-receipt-path
+                        (read-receipt read-receipt-path))))
         (with-connection (conn uri)
           (with-open-stream (out (if output-path
                                      (open output-path
@@ -223,8 +229,8 @@
                                             :limit limit
                                             :incremental incremental
                                             :last-value last-value)))
-              (when receipt-path
-                (write-receipt receipt-path new-receipt)))))))))
+              (when write-receipt-path
+                (write-receipt write-receipt-path new-receipt)))))))))
 
 (defun usage ()
   (print-usage-summary "Parameters:~%~@{~A~%~}~%" +options+))
