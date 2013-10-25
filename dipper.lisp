@@ -169,12 +169,13 @@
          (resultset  (query conn sql-string parameters))
          (metadata   (metadata resultset))
          ((idx . ct) (or (when incremental
-                           (iter (for (col . type) in metadata)
-                                 (for i from 0)
-                                 (finding (cons i type)
-                                          such-that (equal col incremental))))
+                           (or (iter (for (col . type) in metadata)
+                                     (for i from 0)
+                                     (finding (cons i type)
+                                              such-that (equal col incremental)))
+                               (error "No such column '~A'" incremental)))
                          (cons nil nil)))
-         (comparator (get-type-comparator ct))
+         (comparator (when ct (get-type-comparator ct)))
          (new-value  (dump-resultset data-stream
                                      resultset
                                      idx
