@@ -8,4 +8,4 @@
 - [X] convert receipts to ini, get rid of json
 - [ ] add --header
 - [ ] add --separator (or --format=cvs/dat ?)
-- [ ] store metadata in receipt files
+- [X] store metadata in receipt files
