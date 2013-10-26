@@ -2,9 +2,10 @@
 - [X] don't close stdout!
 - [X] return -1 on errors
 - [X] add --config (ini)
+- [ ] add --progress
+- [ ] add --null-as
 - [ ] --help shows SBCL help when compiled
 - [ ] interrupt -> term
-- [ ] add --null-as
 - [X] convert receipts to ini, get rid of json
 - [ ] add --header
 - [ ] add --separator (or --format=cvs/dat ?)
