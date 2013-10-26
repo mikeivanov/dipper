@@ -180,7 +180,6 @@
                                      resultset
                                      idx
                                      comparator)))
-    ;; TODO: should I care about receipts here?
     (list :table table
           :columns columns
           :incremental incremental
@@ -227,8 +226,8 @@
                                      (make-synonym-stream '*standard-output*)))
             (let* ((last-value (or last-value (getf receipt :last-value)))
                    (new-receipt (dump-table conn table out
-                                            :columns columns
                                             :limit limit
+                                            :columns columns
                                             :incremental incremental
                                             :last-value last-value)))
               (when write-receipt-path
