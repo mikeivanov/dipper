@@ -196,9 +196,10 @@
   (let ((ini (py-configparser:make-config)))
     (py-configparser:add-section ini "receipt")
     (iter (for (option value) on items-plist by #'cddr)
-          (py-configparser:set-option ini "receipt"
-                                      (keyword-to-string option)
-                                      value))
+          (when value
+            (py-configparser:set-option ini "receipt"
+                                        (keyword-to-string option)
+                                        value)))
     (write-ini-file ini path)))
 
 (defun make-config (options)
