@@ -102,3 +102,8 @@ Installation
 ------------
 
 Coming soon...
+
+License
+-------
+
+This software is covered by the [MIT](./LICENSE) license.
