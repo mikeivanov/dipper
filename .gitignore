@@ -1,4 +1,4 @@
 *.dx64fsl
 *.fasl
-/dipper
+dist/
 .DS_Store
