@@ -39,7 +39,23 @@
 
 (defgeneric query- (type conn sql &optional parameters))
 
-(defparameter *mysql-string-to-type-map* (make-hash-table))
+(defun string-to-nil (string)
+  (declare (ignore string))
+  nil)
+
+(defparameter *mysql-string-to-type-map*
+  (plist-hash-table  (list
+                      :DECIMAL    #'cl-mysql-system::string-to-ratio
+                      :TINY       #'cl-mysql-system::string-to-integer
+                      :SHORT      #'cl-mysql-system::string-to-integer
+                      :LONG       #'cl-mysql-system::string-to-integer
+                      :FLOAT      #'cl-mysql-system::string-to-float
+                      :DOUBLE     #'cl-mysql-system::string-to-float
+                      :NULL       #'string-to-nil
+                      :LONGLONG   #'cl-mysql-system::string-to-integer
+                      :INT24      #'cl-mysql-system::string-to-integer
+                      :YEAR       #'cl-mysql-system::string-to-integer
+                      :NEWDECIMAL #'cl-mysql-system::string-to-ratio)))
 
 (defmethod query- ((type (eql :mysql)) conn sql &optional parameters)
   (let* ((cl-mysql:*type-map* *mysql-string-to-type-map*)
