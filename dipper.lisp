@@ -26,7 +26,8 @@
     (("output") "PATH" "Store results to PATH. Default: stdout")
     (("receipt") "PATH" "Read and write receipt file at PATH.")
     (("write-receipt") "PATH" "Override the receipt destination specified by --receipt.")
-    (("config") "PATH" "Read config from PATH.")))
+    (("config") "PATH" "Read config from PATH.")
+    (("progress") "N" "Print a dot for every N dumped rows.")))
 
 (defun parse-options (argv)
   (let ((options (make-hash-table))
@@ -104,6 +105,8 @@
                                :then (parse-namestring output)))
            (incremental (param incremental
                                :then (string-downcase incremental)))
+           (progress (param progress
+                            :then (parse-integer progress :junk-allowed t)))
            (last-value (param last-value
                               :then (unless incremental
                                       (error "Incremental is not specified"))))
@@ -125,15 +128,26 @@
             :limit limit
             :output-path output-path
             :read-receipt-path read-receipt-path
-            :write-receipt-path write-receipt-path))))
+            :write-receipt-path write-receipt-path
+            :progress progress))))
 
-(defun dump-resultset (stream resultset incremental comparator)
-  (iter (for row = (next-row resultset))
-        (while row)
-        (format stream #?"~{~A~^\t~}~%" row)
-        (when incremental
-          (for val = (elt row incremental))
-          (reducing val by (lambda (a b) (if (funcall comparator a b) b a))))))
+(defun dump-resultset (stream resultset incremental comparator progress)
+  (let ((last-value
+         (iter (for row = (next-row resultset))
+               (for i from 1)
+               (while row)
+               (format stream #?"~{~A~^\t~}~%" row)
+               (when (and progress
+                          (= (mod i progress) 0))
+                 (format *error-output* ".")
+                 (force-output *error-output*))
+               (when incremental
+                 (for val = (elt row incremental))
+                 (reducing val by (lambda (a b)
+                                    (if (funcall comparator a b) b a)))))))
+    (format *error-output* "~%")
+    (force-output *error-output*)
+    last-value))
 
 (defparameter *type-comparator-map*
   (plist-hash-table (list :int      #'<
@@ -158,7 +172,7 @@
                   by (lambda (a b) (format nil "~A, ~A" a b)))))
 
 (defun dump-table (conn table data-stream
-                   &key (columns "*") limit incremental last-value)
+                   &key (columns "*") limit incremental last-value progress)
   (bind ((limit-spec (if limit (format nil "LIMIT ~D" limit) ""))
          (where-spec (if (and incremental last-value)
                          (format nil "WHERE ~A > ?" incremental)
@@ -179,7 +193,8 @@
          (new-value  (dump-resultset data-stream
                                      resultset
                                      idx
-                                     comparator)))
+                                     comparator
+                                     progress)))
     (list :table table
           :columns columns
           :incremental incremental
@@ -213,7 +228,8 @@
       (usage)
       (bind ((config (make-config options))
              ((:plist uri table columns limit incremental last-value
-                      output-path read-receipt-path write-receipt-path)
+                      output-path read-receipt-path write-receipt-path
+                      progress)
               (prepare-parameters config))
              (receipt (when read-receipt-path
                         (read-receipt read-receipt-path))))
@@ -229,7 +245,8 @@
                                             :limit limit
                                             :columns columns
                                             :incremental incremental
-                                            :last-value last-value)))
+                                            :last-value last-value
+                                            :progress progress)))
               (when write-receipt-path
                 (write-receipt write-receipt-path new-receipt)))))))))
 
