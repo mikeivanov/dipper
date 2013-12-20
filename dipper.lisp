@@ -14,7 +14,7 @@
   ((message :initarg :message :reader dipper-error-message)))
 
 (defparameter +options+
-  `((("help") nil "Help saves the world")
+  `((("help") nil "Print this text")
     (("database") "DATABASE" "Database connection")
     (("table") "TABLE" "Table name")
     (("columns") "COL1,COL2,...,COLN" "A comma-separated column list")
