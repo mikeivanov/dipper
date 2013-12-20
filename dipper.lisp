@@ -19,6 +19,7 @@
     (("table") "TABLE" "Table name")
     (("columns") "COL1,COL2,...,COLN" "A comma-separated column list")
     (("separator") "SYMBOL" "Seprarate columns using SYMBOL. Default: TAB.")
+    (("escape") "REPL" "Replace the separator symbol with REPL in text fields.")
     (("incremental") "COLUMN" "Do an incremental update using this column")
     (("last-value") "VALUE" "The last seen value in the incremental column")
     (("limit") "N" "Limit the results to only N first rows.")
@@ -106,6 +107,7 @@
                         (cond ((equal separator "TAB") #?"\t")
                               ((equal separator "NUL") #?"\0")
                               (t separator))))
+           (escape (param escape))
            (output-path (param output
                                :then (parse-namestring output)))
            (incremental (param incremental
@@ -135,16 +137,25 @@
             :read-receipt-path read-receipt-path
             :write-receipt-path write-receipt-path
             :progress progress
-            :separator separator))))
+            :separator separator
+            :escape escape))))
 
-(defun dump-resultset (stream resultset incremental comparator progress separator)
+(defun replace-separator (string separator replacement)
+  (if (and (stringp string) replacement)
+      (cl-ppcre:regex-replace-all separator string replacement)
+      string))
+
+(defun dump-resultset (stream resultset incremental comparator progress separator escape)
   (let ((last-value
          (iter (for row = (next-row resultset))
                (for i from 1)
                (while row)
-               (format stream "~A" (car row))
+               (format stream "~A"
+                       (replace-separator (car row) separator escape))
                (dolist (col (cdr row))
-                 (format stream "~A~A" separator col))
+                 (format stream "~A~A"
+                         separator
+                         (replace-separator col separator escape)))
                (format stream "~%")
                (when (and progress
                           (= (mod i progress) 0))
@@ -182,7 +193,7 @@
 
 (defun dump-table (conn table data-stream
                    &key (columns "*") limit incremental last-value progress
-                        separator)
+                        separator escape)
   (bind ((limit-spec (if limit (format nil "LIMIT ~D" limit) ""))
          (where-spec (if (and incremental last-value)
                          (format nil "WHERE ~A > ?" incremental)
@@ -205,7 +216,8 @@
                                      idx
                                      comparator
                                      progress
-                                     separator)))
+                                     separator
+                                     escape)))
     (list :table table
           :columns columns
           :incremental incremental
@@ -240,7 +252,7 @@
       (bind ((config (make-config options))
              ((:plist uri table columns limit incremental last-value
                       output-path read-receipt-path write-receipt-path
-                      progress separator)
+                      progress separator escape)
               (prepare-parameters config))
              (receipt (when read-receipt-path
                         (read-receipt read-receipt-path))))
@@ -258,7 +270,8 @@
                                             :incremental incremental
                                             :last-value last-value
                                             :progress progress
-                                            :separator separator)))
+                                            :separator separator
+                                            :escape escape)))
               (when write-receipt-path
                 (write-receipt write-receipt-path new-receipt)))))))))
 
